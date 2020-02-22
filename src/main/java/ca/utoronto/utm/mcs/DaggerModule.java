@@ -21,11 +21,18 @@ public class DaggerModule {
 	
     @Provides public MongoClient provideMongoClient() {
         /* TODO: Fill in this function */
-    	return null;
+    	db = MongoClients.create();
+    	return db;
     }
 
     @Provides public HttpServer provideHttpServer() {
         /* TODO: Fill in this function */
-        return null;
+    	try {
+			server = HttpServer.create(new InetSocketAddress("0.0.0.0", 8080), 0);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+        return server;
     }
 }
