@@ -166,27 +166,21 @@ public class PostService implements HttpHandler {
 
 				// Convert HTTP Request Body to JSON Object
 				JSONObject body = new JSONObject(Utils.convert(r.getRequestBody()));
-				
-				// Parse _id parameter from JSON Object
-				String id = "";
-                if (body.has("_id")) id = body.getString("_id");
-              
-                // Check if all required parameters provided
-                if (id.isEmpty()) {
+				              
+                if (!body.has("_id")) {
                 	r.sendResponseHeaders(400, -1); // 400 BAD REQUEST 
                 	return;
                 }
-				
-				// Create new Search query with given _id
-				Document search = new Document("_id",  new ObjectId(id));
+                
+                String id = body.getString("_id");
+				Document query = new Document("_id",  new ObjectId(id));
 			
-				// Delete post if post exists
-				if (db.getDatabase("csc301a2").getCollection("posts").findOneAndDelete(search) != null) {
+				if (db.getDatabase("csc301a2").getCollection("posts").find(query).first() != null) {
+					db.getDatabase("csc301a2").getCollection("posts").findOneAndDelete(query);
 					r.sendResponseHeaders(200, -1); // 200 OK
 					return;
-				};
-				
-				// If post does not exist
+				}
+
 				r.sendResponseHeaders(404, -1); // 404 NOT FOUND
 				return;
 			}
