@@ -8,7 +8,9 @@ import java.util.List;
 
 import javax.inject.Inject;
 
+import org.bson.BSON;
 import org.bson.Document;
+import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -102,20 +104,15 @@ public class PostService implements HttpHandler {
 				// Convert HTTP Request Body to JSON Object
 				JSONObject body = new JSONObject(Utils.convert(r.getRequestBody()));
 				
-				
-				// Parse _id parameter from JSON Object
-				String id = "";
-                if (body.has("_id")) id = body.getString("_id");
-                
                 // Search by _id
-                if (!id.isEmpty()) {
-
-    				Document search = new Document("_id",  new ObjectId(id));
-    				Document post = db.getDatabase("csc301a2").getCollection("posts").find(search).first();
+                if (body.has("_id")) {
+                	
+                	String id = body.getString("_id");
+    				Document query = new Document("_id",  new ObjectId(id));
+    				Document post = db.getDatabase("csc301a2").getCollection("posts").find(query).first();
 
     				if (post != null) {
     					
-    					// Write JSON Response with appropriate Status Code
         				String response = post.toJson().toString();
         				r.sendResponseHeaders(200, response.length()); // 200 OK
         				OutputStream output = r.getResponseBody();
@@ -129,44 +126,25 @@ public class PostService implements HttpHandler {
                 }
                 
                 
-                // Parse title parameter from JSON Object
-				String title = "";
-                if (body.has("title")) title = body.getString("title");
-                
                 // Search by title
-                if (!title.isEmpty()) {
+                if (body.has("title")) {
                 	
-//                	System.out.println(1);
-    				
-                	db.getDatabase("csc301a2").getCollection("posts").createIndex(new Document("title", "text"));
-    				
-//    				System.out.println(2);
-    				
-    				Document search = new Document("$text", new Document("$search", "\"" + title + "\""));
-    				Document projection = new Document("score", new Document("$meta", "textScore"));
-    				Document sort = new Document("score", new Document("$meta", "textScore"));
-    				
-//    				System.out.println(3);
-    				
-    				MongoCursor<Document> posts = db.getDatabase("csc301a2").getCollection("posts").find(Filters.regex("title", title)).cursor();
+                	String title = body.getString("title");
+                	Bson query = Filters.regex("title", title);
+    				MongoCursor<Document> posts = db.getDatabase("csc301a2").getCollection("posts").find(query).cursor();
 		
-//    				System.out.println(4);
     				
     				if (!posts.hasNext()) {
     					r.sendResponseHeaders(404, -1); // 404 NOT FOUND 
                     	return;
     				}
     				
-    				
-    				ArrayList<String> postList = new ArrayList<String>();
-    				
-    				
+    				ArrayList<String> temp = new ArrayList<String>();
     				while (posts.hasNext()) {
-    					postList.add(posts.next().toJson());
+    					temp.add(posts.next().toJson());
     				}
     				
-    				// Write JSON Response with appropriate Status Code
-    				String response = postList.toString();
+    				String response = temp.toString();
     				r.sendResponseHeaders(200, response.length()); // 200 OK
     				OutputStream output = r.getResponseBody();
                     output.write(response.getBytes());
