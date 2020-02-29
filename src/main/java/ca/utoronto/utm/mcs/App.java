@@ -21,12 +21,8 @@ public class App
     {
     	Dagger service = DaggerDaggerComponent.create().buildMongoHttp();
     	
-    	//Create DB here
-    	MongoDatabase database = service.getDb().getDatabase("csc301a2");
-    	MongoCollection<Document> collection = database.getCollection("posts");
-    	
-    	//Create your server context here
-    	service.getServer().createContext("/api/v1/post", new PostService(collection));
+    	// TODO : Create your server context here
+    	service.getServer().createContext("/api/v1/post", DaggerDaggerComponent.create().buildPostService());
     	service.getServer().start();
     	
     	System.out.printf("Server started on port %d", port);

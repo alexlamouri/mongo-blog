@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import javax.inject.Inject;
+
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.json.JSONArray;
@@ -24,23 +26,32 @@ import dagger.Provides;
 import com.mongodb.BasicDBObject;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.ServerAddress;
+import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
 
 public class PostService implements HttpHandler {
 
-	private MongoCollection<Document> collection;
+	private MongoClient db;
 
-	public PostService(MongoCollection<Document> collection) {
-		this.collection = collection;
+	@Inject
+	public PostService(MongoClient db) {
+		this.db = db;
 	}
 
 	@Override
 	public void handle(HttpExchange r) throws IOException {
-		// TODO Auto-generated method stub
+		
 		
 		try {
+			
 			
 			// PUT /api/v1/post
 			if (r.getRequestMethod().equals("PUT")) {
@@ -48,55 +59,35 @@ public class PostService implements HttpHandler {
 				// Convert HTTP Request Body to JSON Object
 				JSONObject body = new JSONObject(Utils.convert(r.getRequestBody()));
 				
-				// Parse title parameter from JSON Object
-				String title = "";
-                if (body.has("title")) title = body.getString("title");
-                
-                // Parse author parameter from JSON Object
-                String author = "";
-                if (body.has("author")) author = body.getString("author");
-                
-                // Parse content parameter from JSON Object
-                String content = "";
-                if (body.has("content")) content = body.getString("content");
-                
-                // Parse tags parameter from JSON Object
-                JSONArray jArray = null;
-                if (body.has("tags")) jArray = body.getJSONArray("tags");
-                
-                // Check if all required parameters provided
-                if (title.isEmpty() || author.isEmpty() || content.isEmpty() || jArray == null) {
-                	r.sendResponseHeaders(400, -1); // 400 BAD REQUEST 
+				// Check if all required attributes provided
+				if (!body.has("title") || !body.has("author") || !body.has("content") || !body.has("tags")) {
+					r.sendResponseHeaders(400, -1); // 400 BAD REQUEST 
                 	return;
+				}
+				
+				// Parse attributes from JSON Object
+				String title = body.getString("title");
+                String author = body.getString("author");
+                String content = body.getString("content");
+                
+                JSONArray temp = body.getJSONArray("tags");
+				ArrayList<String> tags = new ArrayList<String>();
+                for (int i = 0; i < temp.length(); i++) {
+                	tags.add(temp.getString(i));
                 }
                 
-                // Create new Document
-				Document document = new Document();
-				
-				// Add parameters to Document
-				document.put("title", title);
-				document.put("author", author);
-				document.put("content", content);
-				
-				// Convert JSONArray to ArrayList
-				ArrayList<String> tags = new ArrayList<String>(jArray.length());
-                for (int i = 0; i < jArray.length(); i++) {
-                	tags.add(jArray.getString(i));
-                }
-				document.put("tags", tags);
+                // Create new post with given attributes
+				Document post = new Document();
+				post.put("title", title);
+				post.put("author", author);
+				post.put("content", content);
+                post.put("tags", tags);
 				
 				// Insert Document to Collection
-				collection.insertOne(document);
-				
-				// Get _id of inserted Document
-				ObjectId id = document.getObjectId("_id");
-				
-				// Create JSON Response with inserted Document _id
-				JSONObject jObject = new JSONObject();
-				jObject.put("_id", id);
+				db.getDatabase("csc301a2").getCollection("posts").insertOne(post);
 				
 				// Write JSON Response with appropriate Status Code
-				String response = jObject.toString();
+				String response = new JSONObject().put("_id", post.getObjectId("_id")).toString();
 				r.sendResponseHeaders(200, response.length()); // 200 OK
 				OutputStream output = r.getResponseBody();
                 output.write(response.getBytes());
@@ -104,9 +95,93 @@ public class PostService implements HttpHandler {
 				return;
 			}
 			
+			
 			// GET /api/v1/post
 			else if (r.getRequestMethod().equals("GET")) {
+				
+				// Convert HTTP Request Body to JSON Object
+				JSONObject body = new JSONObject(Utils.convert(r.getRequestBody()));
+				
+				
+				// Parse _id parameter from JSON Object
+				String id = "";
+                if (body.has("_id")) id = body.getString("_id");
+                
+                // Search by _id
+                if (!id.isEmpty()) {
+
+    				Document search = new Document("_id",  new ObjectId(id));
+    				Document post = db.getDatabase("csc301a2").getCollection("posts").find(search).first();
+
+    				if (post != null) {
+    					
+    					// Write JSON Response with appropriate Status Code
+        				String response = post.toJson().toString();
+        				r.sendResponseHeaders(200, response.length()); // 200 OK
+        				OutputStream output = r.getResponseBody();
+                        output.write(response.getBytes());
+                        output.close();
+        				return;
+    				}
+    				
+    				r.sendResponseHeaders(404, -1); // 404 NOT FOUND
+					return;
+                }
+                
+                
+                // Parse title parameter from JSON Object
+				String title = "";
+                if (body.has("title")) title = body.getString("title");
+                
+                // Search by title
+                if (!title.isEmpty()) {
+                	
+//                	System.out.println(1);
+    				
+                	db.getDatabase("csc301a2").getCollection("posts").createIndex(new Document("title", "text"));
+    				
+//    				System.out.println(2);
+    				
+    				Document search = new Document("$text", new Document("$search", "\"" + title + "\""));
+    				Document projection = new Document("score", new Document("$meta", "textScore"));
+    				Document sort = new Document("score", new Document("$meta", "textScore"));
+    				
+//    				System.out.println(3);
+    				
+    				MongoCursor<Document> posts = db.getDatabase("csc301a2").getCollection("posts").find(Filters.regex("title", title)).cursor();
+		
+//    				System.out.println(4);
+    				
+    				if (!posts.hasNext()) {
+    					r.sendResponseHeaders(404, -1); // 404 NOT FOUND 
+                    	return;
+    				}
+    				
+    				
+    				ArrayList<String> postList = new ArrayList<String>();
+    				
+    				
+    				while (posts.hasNext()) {
+    					postList.add(posts.next().toJson());
+    				}
+    				
+    				// Write JSON Response with appropriate Status Code
+    				String response = postList.toString();
+    				r.sendResponseHeaders(200, response.length()); // 200 OK
+    				OutputStream output = r.getResponseBody();
+                    output.write(response.getBytes());
+                    output.close();
+    				return;
+                }
+                
+                
+                // If no _id and no title
+                else {
+                	r.sendResponseHeaders(400, -1); // 400 BAD REQUEST 
+                	return;
+                }
 			}
+			
 			
 			// DELETE /api/v1/post
 			else if (r.getRequestMethod().equals("DELETE")) {
@@ -123,15 +198,12 @@ public class PostService implements HttpHandler {
                 	r.sendResponseHeaders(400, -1); // 400 BAD REQUEST 
                 	return;
                 }
-                  
-                // Create new Query Document
-				Document document = new Document();
 				
-				// Add given _id to Query Document
-				document.put("_id",  new ObjectId(id));
+				// Create new Search query with given _id
+				Document search = new Document("_id",  new ObjectId(id));
 			
 				// Delete post if post exists
-				if (collection.findOneAndDelete(document) != null) {
+				if (db.getDatabase("csc301a2").getCollection("posts").findOneAndDelete(search) != null) {
 					r.sendResponseHeaders(200, -1); // 200 OK
 					return;
 				};
@@ -141,18 +213,24 @@ public class PostService implements HttpHandler {
 				return;
 			}
 			
+			
+			// If method other than PUT, GET or DELETE
 			else {
 				r.sendResponseHeaders(405, -1); // 405 METHOD NOT ALLOWED
 				return;
 			}
 		}
 		
+		
+		// JSON Error (improper/missing format)
 		catch (JSONException e) {
         	r.sendResponseHeaders(400, -1); // 400 BAD REQUEST
             e.printStackTrace();
             return;
         }
     	
+		
+		// Server Error (unsuccessful add/delete)
     	catch (IOException e) {
         	r.sendResponseHeaders(500, -1); // 500 INTERNAL SERVER ERROR
             e.printStackTrace();

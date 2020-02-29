@@ -2,6 +2,9 @@ package ca.utoronto.utm.mcs;
 
 import java.io.IOException;
 import java.util.Arrays;
+
+import javax.xml.ws.spi.http.HttpExchange;
+
 import java.net.InetSocketAddress;
 import com.sun.net.httpserver.HttpServer;
 
@@ -19,14 +22,16 @@ public class DaggerModule {
 	private static HttpServer server;
 	private static MongoClient db;
 	
-    @Provides public MongoClient provideMongoClient() {
-        /* TODO: Fill in this function */
+    @Provides 
+    public MongoClient provideMongoClient() {
+        /* TODO : Fill in this function */
     	db = MongoClients.create();
     	return db;
     }
 
-    @Provides public HttpServer provideHttpServer() {
-        /* TODO: Fill in this function */
+    @Provides 
+    public HttpServer provideHttpServer() {
+        /* TODO : Fill in this function */
     	try {
 			server = HttpServer.create(new InetSocketAddress("0.0.0.0", 8080), 0);
 		} catch (IOException e) {
