@@ -63,13 +63,27 @@ public class PostService implements HttpHandler {
 					r.sendResponseHeaders(400, -1); // 400 BAD REQUEST
                 	return;
 				}
-				
-				// Parse attributes from JSON Object
+                
+                // Type check attributes
+                if (body.get("title").getClass() != String.class || body.get("author").getClass() != String.class || body.get("content").getClass() != String.class || body.get("tags").getClass() != JSONArray.class) {
+					r.sendResponseHeaders(400, -1); // 400 BAD REQUEST
+                	return;
+				}
+                
+                // Parse attributes from JSON Object
 				String title = body.getString("title");
                 String author = body.getString("author");
                 String content = body.getString("content");
+ 
 				ArrayList<String> tags = new ArrayList<String>();
                 for (int i = 0; i < body.getJSONArray("tags").length(); i++) {
+                 	
+                	// Type check attributes
+                	if (body.getJSONArray("tags").get(i).getClass() != String.class) {
+                		r.sendResponseHeaders(400, -1); // 400 BAD REQUEST
+                    	return;
+                	}
+                
                 	tags.add(body.getJSONArray("tags").getString(i));
                 }
                 
@@ -102,15 +116,14 @@ public class PostService implements HttpHandler {
                 // If _id is specified (priority)
                 if (body.has("_id")) {
                 	
-                	// Search by _id
-                	String id = body.getString("_id");
-                	
-                	// Check if valid ObjectId
-                	if (!ObjectId.isValid(id)) {
+                	// Type check _id
+                	if (!ObjectId.isValid(body.getString("_id"))) {
                 		r.sendResponseHeaders(400, -1); // 400 BAD REQUEST
                     	return;
                 	}
                 	
+                	// Search by _id
+                	String id = body.getString("_id");
     				Document query = new Document("_id",  new ObjectId(id));
     				Document result = db.getDatabase("csc301a2").getCollection("posts").find(query).first();
 
@@ -135,7 +148,13 @@ public class PostService implements HttpHandler {
                 // If title is specified
                 else if (body.has("title")) {
                 	
-                	// Search by title
+                	// Type check title
+                    if (body.get("title").getClass() != String.class) {
+    					r.sendResponseHeaders(400, -1); // 400 BAD REQUEST
+                    	return;
+    				}
+                	
+                    // Search by title
                 	String title = body.getString("title");
                 	Bson query = Filters.regex("title", title);
     				MongoCursor<Document> result = db.getDatabase("csc301a2").getCollection("posts").find(query).cursor();
@@ -182,16 +201,14 @@ public class PostService implements HttpHandler {
                 	return;
                 }
                 
-                // Search by _id
-            	String id = body.getString("_id");
-            	
-            	// Check if valid ObjectId
-            	if (!ObjectId.isValid(id)) {
+            	// Type check _id
+            	if (!ObjectId.isValid(body.getString("_id"))) {
             		r.sendResponseHeaders(400, -1); // 400 BAD REQUEST
                 	return;
             	}
     
                 // Search by _id
+            	String id = body.getString("_id");
 				Document query = new Document("_id",  new ObjectId(id));
 		
 				// Delete post if found by _id
