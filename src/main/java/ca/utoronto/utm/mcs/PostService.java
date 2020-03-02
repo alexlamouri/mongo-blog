@@ -181,9 +181,17 @@ public class PostService implements HttpHandler {
                 	r.sendResponseHeaders(400, -1); // 400 BAD REQUEST 
                 	return;
                 }
+                
+                // Search by _id
+            	String id = body.getString("_id");
+            	
+            	// Check if valid ObjectId
+            	if (!ObjectId.isValid(id)) {
+            		r.sendResponseHeaders(400, -1); // 400 BAD REQUEST
+                	return;
+            	}
     
                 // Search by _id
-                String id = body.getString("_id");
 				Document query = new Document("_id",  new ObjectId(id));
 		
 				// Delete post if found by _id
